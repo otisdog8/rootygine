@@ -5,6 +5,7 @@
 //! The randomness is added so that moves with the same eval can be chosen randomly.
 
 use chess::{BitBoard, ChessMove, Color, MoveGen, Piece, Square, ALL_SQUARES, EMPTY};
+use log::debug;
 use rand::{prelude::SmallRng, Rng, SeedableRng};
 
 // This  implements Piece Square Tables (PSQT) for each piece type. The
@@ -86,6 +87,8 @@ const PAWN_MG: Psqt = [
      0,   0,   0,   0,   0,   0,   0,   0
 ];
 
+const PIECE_TABLE_ARRAY: [Psqt; 6] = [PAWN_MG, KNIGHT_MG, BISHOP_MG, ROOK_MG, QUEEN_MG, KING_MG];
+
 #[rustfmt::skip]
 pub const FLIP: [usize; 64] = [
     56, 57, 58, 59, 60, 61, 62, 63,
@@ -101,6 +104,8 @@ pub const FLIP: [usize; 64] = [
 pub fn evaluate(board: chess::Board) -> f32 {
     // In the order white, black
     let mut color_eval: [f32; 2] = [0.0, 0.0];
+    let mut color_piece_tables: [i32; 2] = [0, 0];
+
     // In the order of pawn, knight, bishop, root, queen, king
     let piece_values: [f32;6] = [1.0, 3.0, 3.1, 5.0, 12.0, 100.0];
 
@@ -113,6 +118,19 @@ pub fn evaluate(board: chess::Board) -> f32 {
             // Looks for pieces of that type of that color
             let num_of_pieces_of_type = piece_bitboard & color_bitboard;
             color_specific_eval += (num_of_pieces_of_type.popcnt() as f32) * piece_values[i];
+            let mut piece_int = num_of_pieces_of_type.0;
+            let piece_index = piece.to_index();
+            let mut zeros = piece_int.leading_zeros();
+            while zeros != 64 {
+                if color == Color::Black {
+                    color_piece_tables[1] += PIECE_TABLE_ARRAY[piece_index][i];
+                }
+                else {
+                    color_piece_tables[0] += PIECE_TABLE_ARRAY[piece_index][FLIP[i]];
+                }
+                piece_int ^= 1 << piece_int.trailing_zeros();
+                zeros = piece_int.leading_zeros();
+            }
         }
         if color == Color::Black {
             color_eval[1] += color_specific_eval;
@@ -121,42 +139,6 @@ pub fn evaluate(board: chess::Board) -> f32 {
             color_eval[0] += color_specific_eval;
         }
     }
-    let mut placement_black = 0;
-    let mut placement_white = 0;
-    let white = board.color_combined(Color::White);
-    let combined = board.combined();
-    let pawns = board.pieces(Piece::Pawn);
-    let knights = board.pieces(Piece::Knight);
-    let bishops = board.pieces(Piece::Bishop);
-    let rooks = board.pieces(Piece::Rook);
-    let queens = board.pieces(Piece::Queen);
-    let kings = board.pieces(Piece::King);
 
-    // Kings is omitted because it is never used: caught by the if statement
-    for i in 0..64 {
-        let square_board = BitBoard(1u64 << i);
-        if combined & square_board == EMPTY {
-
-        }
-        else if white & square_board != EMPTY {
-            let ind = FLIP[i];
-            // If the square is white
-            placement_white += PAWN_MG[ind] * (pawns & square_board != EMPTY) as i32;
-            placement_white += ROOK_MG[ind] * (rooks & square_board != EMPTY) as i32;
-            placement_white += BISHOP_MG[ind] * (bishops & square_board != EMPTY) as i32;
-            placement_white += KNIGHT_MG[ind] * (knights & square_board != EMPTY) as i32;
-            placement_white += QUEEN_MG[ind] * (queens & square_board != EMPTY) as i32;
-            placement_white += KING_MG[ind] * (kings & square_board != EMPTY) as i32;
-        } else {
-            // If the square is black (if its not empty or white)
-            placement_black += PAWN_MG[i] * (pawns & square_board != EMPTY) as i32;
-            placement_black += ROOK_MG[i] * (rooks & square_board != EMPTY) as i32;
-            placement_black += BISHOP_MG[i] * (bishops & square_board != EMPTY) as i32;
-            placement_black += KNIGHT_MG[i] * (knights & square_board != EMPTY) as i32;
-            placement_black += QUEEN_MG[i] * (queens & square_board != EMPTY) as i32;
-            placement_black += KING_MG[i] * (kings & square_board != EMPTY) as i32;
-        }
-    }
-
-    color_eval[0] - color_eval[1] + placement_white as f32 / 100.0 - placement_black as f32 / 100.0
+    color_eval[0] - color_eval[1] + color_piece_tables[0] as f32 / 100.0 - color_piece_tables[1] as f32 / 100.0
 }
