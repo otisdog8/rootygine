@@ -233,8 +233,7 @@ fn negamax(
     let mut possible_moves = MoveGen::new_legal(&current_board);
     let mut move_eval_arr = vec![];
     for possible_move in possible_moves {
-        let mut new_board = Board::default();
-        current_board.make_move(possible_move, &mut new_board);
+        let new_board = current_board.make_move_new(possible_move);
         let tt_entry = tt.tt.get(&new_board.get_hash());
 
         let eval = match tt_entry {
