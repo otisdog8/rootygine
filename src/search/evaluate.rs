@@ -90,7 +90,7 @@ const PAWN_MG: Psqt = [
 const PIECE_TABLE_ARRAY: [Psqt; 6] = [PAWN_MG, KNIGHT_MG, BISHOP_MG, ROOK_MG, QUEEN_MG, KING_MG];
 
 #[rustfmt::skip]
-pub const FLIP: [usize; 64] = [
+pub const FLIP: [usize; 128] = [
     56, 57, 58, 59, 60, 61, 62, 63,
     48, 49, 50, 51, 52, 53, 54, 55,
     40, 41, 42, 43, 44, 45, 46, 47,
@@ -99,6 +99,14 @@ pub const FLIP: [usize; 64] = [
     16, 17, 18, 19, 20, 21, 22, 23,
      8,  9, 10, 11, 12, 13, 14, 15,
      0,  1,  2,  3,  4,  5,  6,  7,
+     0,  1,  2,  3,  4,  5,  6,  7,
+     8,  9, 10, 11, 12, 13, 14, 15,
+    16, 17, 18, 19, 20, 21, 22, 23,
+    24, 25, 26, 27, 28, 29, 30, 31,
+    32, 33, 34, 35, 36, 37, 38, 39,
+    40, 41, 42, 43, 44, 45, 46, 47,
+    48, 49, 50, 51, 52, 53, 54, 55,
+    56, 57, 58, 59, 60, 61, 62, 63,
 ];
 
 pub fn evaluate(board: chess::Board) -> f32 {
@@ -112,6 +120,7 @@ pub fn evaluate(board: chess::Board) -> f32 {
     for color in chess::ALL_COLORS {
         let color_bitboard = board.color_combined(color);
         let mut color_specific_eval: f32 = 0.0;
+        let mut color_specific_eval_int: i32 = 0;
 
         for (i, piece) in chess::ALL_PIECES.iter().enumerate() {
             let piece_bitboard = board.pieces(*piece);
@@ -122,21 +131,18 @@ pub fn evaluate(board: chess::Board) -> f32 {
             let piece_index = piece.to_index();
             let mut zeros = piece_int.leading_zeros();
             while zeros != 64 {
-                if color == Color::Black {
-                    color_piece_tables[1] += PIECE_TABLE_ARRAY[piece_index][i];
-                }
-                else {
-                    color_piece_tables[0] += PIECE_TABLE_ARRAY[piece_index][FLIP[i]];
-                }
+                color_specific_eval_int += PIECE_TABLE_ARRAY[piece_index][FLIP[64*color.to_index()+i]];
                 piece_int ^= 1 << piece_int.trailing_zeros();
                 zeros = piece_int.leading_zeros();
             }
         }
         if color == Color::Black {
             color_eval[1] += color_specific_eval;
+            color_piece_tables[1] += color_specific_eval_int;
         }
         else {
             color_eval[0] += color_specific_eval;
+            color_piece_tables[0] += color_specific_eval_int;
         }
     }
 
