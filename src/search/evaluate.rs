@@ -4,8 +4,100 @@
 //! that the possible moves decrease from the loss of a bishop may compensate for that. Each additional move would add 0.1
 //! The randomness is added so that moves with the same eval can be chosen randomly.
 
-use chess::{ChessMove, Color, MoveGen, BitBoard};
+use chess::{BitBoard, ChessMove, Color, MoveGen, Square, ALL_SQUARES, Piece};
 use rand::{prelude::SmallRng, Rng, SeedableRng};
+
+
+// This  implements Piece Square Tables (PSQT) for each piece type. The
+// PSQT's are written from White's point of view, as if looking at a chess
+// diagram, with A1 on the lower left corner.
+// Taken from https://github.com/mvanthoor/rustic/blob/master/src/evaluation/psqt.rs
+
+type Psqt = [i8; 64];
+
+#[rustfmt::skip]
+const KING_MG: Psqt = [
+    0,    0,     0,     0,    0,    0,    0,    0,
+    0,    0,     0,     0,    0,    0,    0,    0,
+    0,    0,     0,     0,    0,    0,    0,    0,
+    0,    0,     0,    20,   20,    0,    0,    0,
+    0,    0,     0,    20,   20,    0,    0,    0,
+    0,    0,     0,     0,    0,    0,    0,    0,
+    0,    0,     0,   -10,  -10,    0,    0,    0,
+    0,    0,    30,   -10,  -10,    0,   30,    0,
+];
+
+#[rustfmt::skip]
+const QUEEN_MG: Psqt = [
+    -30,  -20,  -10,  -10,  -10,  -10,  -20,  -30,
+    -20,  -10,   -5,   -5,   -5,   -5,  -10,  -20,
+    -10,   -5,   10,   10,   10,   10,   -5,  -10,
+    -10,   -5,   10,   20,   20,   10,   -5,  -10,
+    -10,   -5,   10,   20,   20,   10,   -5,  -10,
+    -10,   -5,   -5,   -5,   -5,   -5,   -5,  -10,
+    -20,  -10,   -5,   -5,   -5,   -5,  -10,  -20,
+    -30,  -20,  -10,  -10,  -10,  -10,  -20,  -30 
+];
+
+#[rustfmt::skip]
+const ROOK_MG: Psqt = [
+    0,   0,   0,   0,   0,   0,   0,   0,
+   15,  15,  15,  20,  20,  15,  15,  15,
+    0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,  10,  10,  10,   0,   0
+];
+
+#[rustfmt::skip]
+const BISHOP_MG: Psqt = [
+    -20,    0,    0,    0,    0,    0,    0,  -20,
+    -15,    0,    0,    0,    0,    0,    0,  -15,
+    -10,    0,    0,    5,    5,    0,    0,  -10,
+    -10,   10,   10,   30,   30,   10,   10,  -10,
+      5,    5,   10,   25,   25,   10,    5,    5,
+      5,    5,    5,   10,   10,    5,    5,    5,
+    -10,    5,    5,   10,   10,    5,    5,  -10,
+    -20,  -10,  -10,  -10,  -10,  -10,  -10,  -20
+];
+
+#[rustfmt::skip]
+const KNIGHT_MG: Psqt = [
+    -20, -10,  -10,  -10,  -10,  -10,  -10,  -20,
+    -10,  -5,   -5,   -5,   -5,   -5,   -5,  -10,
+    -10,  -5,   15,   15,   15,   15,   -5,  -10,
+    -10,  -5,   15,   15,   15,   15,   -5,  -10,
+    -10,  -5,   15,   15,   15,   15,   -5,  -10,
+    -10,  -5,   10,   15,   15,   15,   -5,  -10,
+    -10,  -5,   -5,   -5,   -5,   -5,   -5,  -10,
+    -20,   0,  -10,  -10,  -10,  -10,    0,  -20
+];
+
+#[rustfmt::skip]
+const PAWN_MG: Psqt = [
+     0,   0,   0,   0,   0,   0,   0,   0,
+    60,  60,  60,  60,  70,  60,  60,  60,
+    40,  40,  40,  50,  60,  40,  40,  40,
+    20,  20,  20,  40,  50,  20,  20,  20,
+     5,   5,  15,  30,  40,  10,   5,   5,
+     5,   5,  10,  20,  30,   5,   5,   5,
+     5,   5,   5, -30, -30,   5,   5,   5,
+     0,   0,   0,   0,   0,   0,   0,   0
+];
+
+#[rustfmt::skip]
+pub const FLIP: [usize; 64] = [
+    56, 57, 58, 59, 60, 61, 62, 63,
+    48, 49, 50, 51, 52, 53, 54, 55,
+    40, 41, 42, 43, 44, 45, 46, 47,
+    32, 33, 34, 35, 36, 37, 38, 39,
+    24, 25, 26, 27, 28, 29, 30, 31,
+    16, 17, 18, 19, 20, 21, 22, 23,
+     8,  9, 10, 11, 12, 13, 14, 15,
+     0,  1,  2,  3,  4,  5,  6,  7,
+];
 
 pub fn evaluate(board: chess::Board) -> f32 {
     // In the order white, black
@@ -26,13 +118,34 @@ pub fn evaluate(board: chess::Board) -> f32 {
 
         color_eval.push(color_specific_eval);
     }
+    let mut placement_black: f32 = 0.0;
+    // Piece weights - black
+    for i in 0..64 {
+        match board.piece_on(ALL_SQUARES[i]) {
+            Some(Piece::Rook) => placement_black += ROOK_MG[i] as f32/100.0,
+            Some(Piece::Bishop) => placement_black += BISHOP_MG[i] as f32/100.0,
+            Some(Piece::Knight) => placement_black += KNIGHT_MG[i] as f32/100.0,
+            Some(Piece::Pawn) => placement_black += PAWN_MG[i] as f32/100.0,
+            Some(Piece::King) => placement_black += KING_MG[i] as f32/100.0,
+            Some(Piece::Queen) => placement_black += QUEEN_MG[i] as f32/100.0,
+            None => (),
+        }
+    }
+    let mut placement_white: f32 = 0.0;
 
-    // Piece out of position
+    // Piece weights - black
+    for i in 0..64 {
+        let ind = FLIP[i];
+        match board.piece_on(ALL_SQUARES[i]) {
+            Some(Piece::Rook) => placement_white += ROOK_MG[ind] as f32/100.0,
+            Some(Piece::Bishop) => placement_white += BISHOP_MG[ind] as f32/100.0,
+            Some(Piece::Knight) => placement_white += KNIGHT_MG[ind] as f32/100.0,
+            Some(Piece::Pawn) => placement_white += PAWN_MG[ind] as f32/100.0,
+            Some(Piece::King) => placement_white += KING_MG[ind] as f32/100.0,
+            Some(Piece::Queen) => placement_white += QUEEN_MG[ind] as f32/100.0,
+            None => (),
+        }
+    }
 
-    // Center (vertical)
-    // Center (horizontal)
-    //
-
-    color_eval[0] - color_eval[1]
-
+    color_eval[0] - color_eval[1] + placement_white - placement_black
 }
