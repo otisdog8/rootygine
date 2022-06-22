@@ -4,7 +4,7 @@
 //! that the possible moves decrease from the loss of a bishop may compensate for that. Each additional move would add 0.1
 //! The randomness is added so that moves with the same eval can be chosen randomly.
 
-use chess::{BitBoard, ChessMove, Color, MoveGen, Piece, Square, ALL_SQUARES};
+use chess::{BitBoard, ChessMove, Color, MoveGen, Piece, Square, ALL_SQUARES, EMPTY};
 use rand::{prelude::SmallRng, Rng, SeedableRng};
 
 // This  implements Piece Square Tables (PSQT) for each piece type. The
@@ -117,35 +117,62 @@ pub fn evaluate(board: chess::Board) -> f32 {
 
         color_eval.push(color_specific_eval);
     }
-    let mut placement_black: f32 = 0.0;
-    let mut placement_white: f32 = 0.0;
-
+    let mut placement_black = 0;
+    let mut placement_white = 0;
+    let white = board.color_combined(Color::White);
+    let combined = board.combined();
+    let pawns = board.pieces(Piece::Pawn);
+    let knights = board.pieces(Piece::Knight);
+    let bishops = board.pieces(Piece::Bishop);
+    let rooks = board.pieces(Piece::Rook);
+    let queens = board.pieces(Piece::Queen);
+    // Kings is omitted because it is never used: caught by the if statement
     for i in 0..64 {
-        match board.color_on(ALL_SQUARES[i]) {
-            None => (),
-            Some(Color::Black) => match board.piece_on(ALL_SQUARES[i]) {
-                Some(Piece::Pawn) => placement_black += PAWN_MG[i] as f32 / 100.0,
-                Some(Piece::Rook) => placement_black += ROOK_MG[i] as f32 / 100.0,
-                Some(Piece::Bishop) => placement_black += BISHOP_MG[i] as f32 / 100.0,
-                Some(Piece::Knight) => placement_black += KNIGHT_MG[i] as f32 / 100.0,
-                Some(Piece::King) => placement_black += KING_MG[i] as f32 / 100.0,
-                Some(Piece::Queen) => placement_black += QUEEN_MG[i] as f32 / 100.0,
-                None => (),
-            },
-            Some(Color::White) => {
-                let ind = FLIP[i];
-                match board.piece_on(ALL_SQUARES[i]) {
-                    Some(Piece::Pawn) => placement_white += PAWN_MG[ind] as f32 / 100.0,
-                    Some(Piece::Rook) => placement_white += ROOK_MG[ind] as f32 / 100.0,
-                    Some(Piece::Bishop) => placement_white += BISHOP_MG[ind] as f32 / 100.0,
-                    Some(Piece::Knight) => placement_white += KNIGHT_MG[ind] as f32 / 100.0,
-                    Some(Piece::King) => placement_white += KING_MG[ind] as f32 / 100.0,
-                    Some(Piece::Queen) => placement_white += QUEEN_MG[ind] as f32 / 100.0,
-                    None => (),
+        let square_board = BitBoard(1u64 << i);
+
+        if combined & square_board == EMPTY {
+            // Do nothing
+        } else if white & square_board != EMPTY {
+            let ind = FLIP[i];
+            // If the square is white
+            if (pawns ^ rooks ^ bishops & square_board != EMPTY) {
+                if pawns & square_board != EMPTY {
+                    placement_white += PAWN_MG[ind];
+                } else if rooks & square_board != EMPTY {
+                    placement_white += ROOK_MG[ind];
+                } else {
+                    placement_white += BISHOP_MG[ind];
                 }
-            },
+            } else {
+                if knights & square_board != EMPTY {
+                    placement_white += KNIGHT_MG[ind];
+                } else if queens & square_board != EMPTY {
+                    placement_white += QUEEN_MG[ind];
+                } else {
+                    placement_white += KING_MG[ind];
+                }
+            }
+        } else {
+            // If the square is black (if its not empty or white)
+            if (pawns ^ rooks ^ bishops & square_board != EMPTY) {
+                if pawns & square_board != EMPTY {
+                    placement_white += PAWN_MG[i];
+                } else if rooks & square_board != EMPTY {
+                    placement_white += ROOK_MG[i];
+                } else {
+                    placement_white += BISHOP_MG[i];
+                }
+            } else {
+                if knights & square_board != EMPTY {
+                    placement_white += KNIGHT_MG[i];
+                } else if queens & square_board != EMPTY {
+                    placement_white += QUEEN_MG[i];
+                } else {
+                    placement_white += KING_MG[i];
+                }
+            }
         }
     }
 
-    color_eval[0] - color_eval[1] + placement_white - placement_black
+    color_eval[0] - color_eval[1] + placement_white as f32 / 100.0 - placement_black as f32 / 100.0
 }
