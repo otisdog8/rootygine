@@ -47,7 +47,7 @@ fn player_play() {
         let color_to_move = Color::Black;
 
         let engine_move =
-            search::iterative_deepening_search(board, color_to_move, 5, &mut transposition_table);
+            search::iterative_deepening_search(board, color_to_move, 7, &mut transposition_table);
         board = board.make_move_new(engine_move);
         println!("Engine move: {}", engine_move);
 
