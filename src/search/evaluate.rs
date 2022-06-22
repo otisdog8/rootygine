@@ -12,7 +12,7 @@ use rand::{prelude::SmallRng, Rng, SeedableRng};
 // diagram, with A1 on the lower left corner.
 // Taken from https://github.com/mvanthoor/rustic/blob/master/src/evaluation/psqt.rs
 
-type Psqt = [i8; 64];
+type Psqt = [i32; 64];
 
 #[rustfmt::skip]
 const KING_MG: Psqt = [
@@ -100,9 +100,9 @@ pub const FLIP: [usize; 64] = [
 
 pub fn evaluate(board: chess::Board) -> f32 {
     // In the order white, black
-    let mut color_eval: Vec<f32> = vec![];
+    let mut color_eval: [f32; 2] = [0.0, 0.0];
     // In the order of pawn, knight, bishop, root, queen, king
-    let piece_values: Vec<f32> = vec![1.0, 3.0, 3.1, 5.0, 12.0, 100.0];
+    let piece_values: [f32;6] = [1.0, 3.0, 3.1, 5.0, 12.0, 100.0];
 
     for color in chess::ALL_COLORS {
         let color_bitboard = board.color_combined(color);
@@ -114,8 +114,12 @@ pub fn evaluate(board: chess::Board) -> f32 {
             let num_of_pieces_of_type = piece_bitboard & color_bitboard;
             color_specific_eval += (num_of_pieces_of_type.popcnt() as f32) * piece_values[i];
         }
-
-        color_eval.push(color_specific_eval);
+        if color == Color::Black {
+            color_eval[1] += color_specific_eval;
+        }
+        else {
+            color_eval[0] += color_specific_eval;
+        }
     }
     let mut placement_black = 0;
     let mut placement_white = 0;
@@ -126,51 +130,31 @@ pub fn evaluate(board: chess::Board) -> f32 {
     let bishops = board.pieces(Piece::Bishop);
     let rooks = board.pieces(Piece::Rook);
     let queens = board.pieces(Piece::Queen);
+    let kings = board.pieces(Piece::King);
+
     // Kings is omitted because it is never used: caught by the if statement
     for i in 0..64 {
         let square_board = BitBoard(1u64 << i);
-
         if combined & square_board == EMPTY {
-            // Do nothing
-        } else if white & square_board != EMPTY {
+
+        }
+        else if white & square_board != EMPTY {
             let ind = FLIP[i];
             // If the square is white
-            if (pawns ^ rooks ^ bishops & square_board != EMPTY) {
-                if pawns & square_board != EMPTY {
-                    placement_white += PAWN_MG[ind];
-                } else if rooks & square_board != EMPTY {
-                    placement_white += ROOK_MG[ind];
-                } else {
-                    placement_white += BISHOP_MG[ind];
-                }
-            } else {
-                if knights & square_board != EMPTY {
-                    placement_white += KNIGHT_MG[ind];
-                } else if queens & square_board != EMPTY {
-                    placement_white += QUEEN_MG[ind];
-                } else {
-                    placement_white += KING_MG[ind];
-                }
-            }
+            placement_white += PAWN_MG[ind] * (pawns & square_board != EMPTY) as i32;
+            placement_white += ROOK_MG[ind] * (rooks & square_board != EMPTY) as i32;
+            placement_white += BISHOP_MG[ind] * (bishops & square_board != EMPTY) as i32;
+            placement_white += KNIGHT_MG[ind] * (knights & square_board != EMPTY) as i32;
+            placement_white += QUEEN_MG[ind] * (queens & square_board != EMPTY) as i32;
+            placement_white += KING_MG[ind] * (kings & square_board != EMPTY) as i32;
         } else {
             // If the square is black (if its not empty or white)
-            if (pawns ^ rooks ^ bishops & square_board != EMPTY) {
-                if pawns & square_board != EMPTY {
-                    placement_white += PAWN_MG[i];
-                } else if rooks & square_board != EMPTY {
-                    placement_white += ROOK_MG[i];
-                } else {
-                    placement_white += BISHOP_MG[i];
-                }
-            } else {
-                if knights & square_board != EMPTY {
-                    placement_white += KNIGHT_MG[i];
-                } else if queens & square_board != EMPTY {
-                    placement_white += QUEEN_MG[i];
-                } else {
-                    placement_white += KING_MG[i];
-                }
-            }
+            placement_black += PAWN_MG[i] * (pawns & square_board != EMPTY) as i32;
+            placement_black += ROOK_MG[i] * (rooks & square_board != EMPTY) as i32;
+            placement_black += BISHOP_MG[i] * (bishops & square_board != EMPTY) as i32;
+            placement_black += KNIGHT_MG[i] * (knights & square_board != EMPTY) as i32;
+            placement_black += QUEEN_MG[i] * (queens & square_board != EMPTY) as i32;
+            placement_black += KING_MG[i] * (kings & square_board != EMPTY) as i32;
         }
     }
 
