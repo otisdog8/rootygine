@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use chess::ChessMove;
 
-const THREADS: usize = 6;
+const THREADS: usize = 1;
 
 pub fn divide_work(possible_moves: &mut VecDeque<ChessMove>) -> Vec<Vec<ChessMove>> {
     // Try to split them up as evenly as possible

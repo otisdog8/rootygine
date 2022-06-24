@@ -129,11 +129,9 @@ pub fn evaluate(board: chess::Board) -> f32 {
             color_specific_eval += (num_of_pieces_of_type.popcnt() as f32) * piece_values[i];
             let mut piece_int = num_of_pieces_of_type.0;
             let piece_index = piece.to_index();
-            let mut zeros = piece_int.leading_zeros();
             for j in 0..piece_int.count_ones() {
-                color_specific_eval_int += PIECE_TABLE_ARRAY[piece_index][FLIP[64*color.to_index()+i]];
+                color_specific_eval_int += PIECE_TABLE_ARRAY[piece_index][FLIP[64*color.to_index()+piece_int.leading_zeros() as usize]];
                 piece_int ^= 1 << piece_int.trailing_zeros();
-                zeros = piece_int.leading_zeros();
             }
         }
         if color == Color::Black {

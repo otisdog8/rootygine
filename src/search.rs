@@ -1,6 +1,7 @@
-use std::cmp::Ordering;
+use std::cmp::{Ordering, max};
 use std::thread;
 
+use chess::BoardStatus;
 use chess::{Board, ChessMove, Color, MoveGen};
 use log::debug;
 use rand::{prelude::SmallRng, SeedableRng};
@@ -9,6 +10,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use transposition_table::{Flag, TransTable, TransTableEntry};
+
+use self::utils::flip_color;
 
 mod evaluate;
 mod threading;
@@ -46,6 +49,70 @@ impl Ord for MoveEval {
         }
     }
 }
+
+pub fn new_search(
+    board: Board,
+    color_to_move: Color,
+    target_depth: i32,
+    tt_raw: Option<Arc<Mutex<TransTable>>>,
+) -> Option<ChessMove> {
+
+    None
+}
+
+enum Algorithm {
+    MinMax,
+    ABPrune,
+    PVS,
+    MTDF,
+}
+
+fn search_root(board: Board, depth: i32, color_to_move: Color, tt: Arc<Mutex<TransTable>>) -> Option<ChessMove> {
+
+    None
+}
+
+fn minmax_memory(board: Board, depth: i32, color_to_move: Color, tt: Arc<Mutex<TransTable>>) -> (f32, Option<ChessMove>) {
+    // Handle Checkmate and Stalemate
+    match board.status() {
+        BoardStatus::Checkmate => return (9999.9, None),
+        BoardStatus::Stalemate => return (0.0, None),
+        BoardStatus::Ongoing => (),
+    }
+    let mut eval;
+    let mut best_move = None;
+    // Check for cached in transposition table
+    let tt_mutex = tt.lock().unwrap();
+    // TODO later
+    if depth == 0 {
+        eval =  evaluate::evaluate(board);
+    }
+    else {
+        let moves = MoveGen::new_legal(&board);
+        eval = -99999.9;
+        for possible_move in moves {
+            let score = -minmax_memory(board.make_move_new(possible_move), depth-1, flip_color(color_to_move), tt.clone()).0;
+            if eval < score {
+                eval = score;
+                best_move = Some(possible_move);
+            }
+        }
+    }
+    return (eval, best_move);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Uses iterative deepening technique and transposition tables to optimize faster search
 pub fn iterative_deepening_search(
@@ -195,7 +262,7 @@ fn negamax(
     rng: &mut SmallRng,
 ) -> f32 {
     let alpha_original = alpha;
-    let current_board_status = current_board.status();
+    let current_board_status = current_board.status();  
 
     // Check if it's a terminal node
     if current_board_status == chess::BoardStatus::Checkmate {

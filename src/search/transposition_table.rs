@@ -34,6 +34,7 @@ pub struct TransTable {
     /// Wrapper of transposition table so it associates hash with an entry
     // Do NOT directly write
     pub tt: HashMap<u64, TransTableEntry>,
+    age: u64,
 }
 
 
@@ -46,6 +47,7 @@ impl TransTable {
         // Allocate all the memory at once because it's expensive af to do on the fly
         TransTable {
             tt: HashMap::with_capacity(MAX_ENTRIES),
+            age: 0,
         }
     }
 
@@ -57,6 +59,17 @@ impl TransTable {
         }
 
         self.tt.insert(board.get_hash(), entry);
+    }
+/*
+    pub fn get(self, board: Board) -> Option<TransTableEntry> {
+        match self.tt.get(&board.get_hash()) {
+            Some(entry) => return Some(*entry),
+            None => None,
+        }
+    }
+*/
+    pub fn increment_age(&mut self) {
+        self.age += 1;
     }
 }
 

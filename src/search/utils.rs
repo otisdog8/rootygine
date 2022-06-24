@@ -1,7 +1,7 @@
 use std::sync::atomic::{self, AtomicU32};
 
 use atomic::Ordering;
-use chess::{ChessMove, Color};
+use chess::{ChessMove, Color, Board, BoardStatus};
 
 pub fn flip_color(input_color: Color) -> Color {
     if input_color == Color::White {
@@ -19,6 +19,20 @@ pub fn dump_top_moves(moves: &Vec<ChessMove>) -> Vec<String> {
     }
 
     output
+}
+
+pub fn fast_board_status(board: Board) -> BoardStatus {
+    // If king is checked
+    // Can the king move
+    // Can pieces block
+    // Can checkers be taken
+    // 2+ checkers + no king move = checkmate
+    // 1 checker, no block, can't be taken, no king move = checkmate
+
+
+    // Stalemate
+    // If king and pinned pieces cannot move
+    BoardStatus::Ongoing
 }
 
 // Stolen shamelessly from https://github.com/rust-lang/rust/issues/72353 because
